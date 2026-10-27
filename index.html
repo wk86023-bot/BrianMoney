@@ -374,10 +374,14 @@
                 </div>
             </div>
 
+            <!-- 備份與還原按鈕 -->
             <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);">
-                <button type="button" class="btn btn-secondary" onclick="exportData()" style="font-size: 0.8rem; padding: 8px;">💾 備份匯出</button>
-                <button type="button" class="btn btn-success" onclick="document.getElementById('import-file').click()" style="font-size: 0.8rem; padding: 8px;">📂 還原匯入</button>
+                <button type="button" class="btn btn-secondary" onclick="exportData()" style="font-size: 0.8rem; padding: 8px;">💾 覆蓋備份</button>
+                <button type="button" class="btn btn-success" onclick="document.getElementById('import-file').click()" style="font-size: 0.8rem; padding: 8px;">📂 讀取備份</button>
                 <input type="file" id="import-file" style="display: none;" accept=".json" onchange="importData(event)">
+            </div>
+            <div id="backup-hint" style="font-size: 0.7rem; color: var(--text-secondary); text-align: center; margin-top: 6px;">
+                提示：點擊覆蓋備份將更新固定檔案 (my_finance_data.json)
             </div>
         </div>
 
@@ -521,6 +525,13 @@
     function saveData() {
         localStorage.setItem('my_transactions', JSON.stringify(transactions));
         localStorage.setItem('my_budgets', JSON.stringify(budgets));
+        
+        let lastBackup = localStorage.getItem('last_backup_date');
+        let now = new Date().getTime();
+        if (!lastBackup || (now - lastBackup > 7 * 24 * 60 * 60 * 1000)) {
+            document.getElementById('backup-hint').innerHTML = '⚠️ 超過 7 天未備份，請點擊「覆蓋備份」更新！';
+            document.getElementById('backup-hint').style.color = 'var(--danger)';
+        }
     }
 
     function exportData() {
@@ -532,10 +543,14 @@
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
         const downloadAnchor = document.createElement('a');
         downloadAnchor.setAttribute("href", dataStr);
-        downloadAnchor.setAttribute("download", `finance_backup_${new Date().toISOString().split('T')[0]}.json`);
+        downloadAnchor.setAttribute("download", "my_finance_data.json");
         document.body.appendChild(downloadAnchor);
         downloadAnchor.click();
         downloadAnchor.remove();
+
+        localStorage.setItem('last_backup_date', new Date().getTime());
+        document.getElementById('backup-hint').innerHTML = '✅ 備份已更新 (my_finance_data.json)';
+        document.getElementById('backup-hint').style.color = 'var(--success)';
     }
 
     function importData(event) {
@@ -867,6 +882,12 @@
     }
 
     updateDashboard();
+    let lastBackup = localStorage.getItem('last_backup_date');
+    let now = new Date().getTime();
+    if (lastBackup && (now - lastBackup > 7 * 24 * 60 * 60 * 1000)) {
+        document.getElementById('backup-hint').innerHTML = '⚠️ 超過 7 天未備份，請點擊「覆蓋備份」更新！';
+        document.getElementById('backup-hint').style.color = 'var(--danger)';
+    }
 </script>
 
 </body>
