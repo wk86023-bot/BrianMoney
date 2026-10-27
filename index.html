@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>個人收支財務報表 (直方圖與真實累進版)</title>
+    <title>個人收支財務報表 (支援明細編輯版)</title>
     <style>
         :root {
             --primary: #4f46e5;
@@ -43,6 +43,7 @@
             display: flex;
             flex-direction: column;
             border: 1px solid var(--border);
+            position: relative;
         }
 
         header {
@@ -57,7 +58,7 @@
             font-weight: 600;
         }
 
-        /* 3個分頁導航：統計、計畫、明細 */
+        /* 分頁導航 */
         .tabs {
             display: flex;
             background: #f1f5f9;
@@ -249,6 +250,10 @@
             opacity: 0.9;
         }
 
+        .btn-secondary {
+            background: #94a3b8;
+        }
+
         .tx-item {
             display: flex;
             justify-content: space-between;
@@ -277,13 +282,21 @@
             font-weight: 600;
         }
 
-        .delete-btn {
+        .action-btn {
             background: none;
             border: none;
-            color: var(--danger);
             cursor: pointer;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             padding: 4px;
+            margin-left: 4px;
+        }
+
+        .delete-btn {
+            color: var(--danger);
+        }
+
+        .edit-btn {
+            color: var(--primary);
         }
 
         .empty-hint {
@@ -291,6 +304,33 @@
             color: var(--text-secondary);
             font-size: 0.85rem;
             padding: 20px 0;
+        }
+
+        /* 彈出編輯視窗 (Modal) */
+        .modal-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            padding: 16px;
+        }
+
+        .modal-card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            width: 100%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .modal-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text);
         }
     </style>
 </head>
@@ -349,7 +389,7 @@
                 <div class="kpi-value" id="kpi-savings" style="color: var(--primary);">NT$ 0</div>
             </div>
 
-            <!-- 直方圖儀表板區塊 -->
+            <!-- 直方圖區塊 -->
             <div class="chart-container">
                 <div class="chart-title">📊 各類別支出直方圖 (本期)</div>
                 <div id="histogram-list">
@@ -363,12 +403,16 @@
             <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">設定各類別月預算</h3>
             <div style="background: #f8fafc; padding: 12px; border-radius: 10px; margin-bottom: 16px;">
                 <div class="form-group">
-                    <label class="form-label">選擇類別</label>
+                    <label class="form-label">選擇支出類別</label>
                     <select id="budget-category" class="form-control">
                         <option value="餐飲">餐飲</option>
                         <option value="居住">居住</option>
                         <option value="交通">交通</option>
                         <option value="娛樂">娛樂</option>
+                        <option value="治裝">治裝</option>
+                        <option value="通信">通信</option>
+                        <option value="學費">學費</option>
+                        <option value="貸款還款">貸款還款</option>
                         <option value="其他">其他</option>
                     </select>
                 </div>
@@ -393,25 +437,18 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">類型</label>
-                    <select id="tx-type" class="form-control">
+                    <select id="tx-type" class="form-control" onchange="updateCategoryOptions('tx-type', 'tx-category')">
                         <option value="expense">支出</option>
                         <option value="income">收入</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">類別</label>
-                    <select id="tx-category" class="form-control">
-                        <option value="餐飲">餐飲</option>
-                        <option value="居住">居住</option>
-                        <option value="交通">交通</option>
-                        <option value="娛樂">娛樂</option>
-                        <option value="薪資">薪資</option>
-                        <option value="其他">其他</option>
-                    </select>
+                    <select id="tx-category" class="form-control"></select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">項目說明</label>
-                    <input type="text" id="tx-desc" class="form-control" placeholder="例如：午餐、薪水" required>
+                    <input type="text" id="tx-desc" class="form-control" placeholder="例如：買衣服、電信費" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">金額 (NT$)</label>
@@ -426,6 +463,41 @@
             </div>
         </div>
     </div>
+
+    <!-- ✏️ 彈出式修改明細視窗 (Modal) -->
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-title">修改收支紀錄</div>
+            <input type="hidden" id="edit-id">
+            <div class="form-group">
+                <label class="form-label">日期</label>
+                <input type="date" id="edit-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">類型</label>
+                <select id="edit-type" class="form-control" onchange="updateCategoryOptions('edit-type', 'edit-category')">
+                    <option value="expense">支出</option>
+                    <option value="income">收入</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">科目類別</label>
+                <select id="edit-category" class="form-control"></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">項目說明</label>
+                <input type="text" id="edit-desc" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">金額 (NT$)</label>
+                <input type="number" id="edit-amount" class="form-control" required>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+                <button type="button" class="btn" onclick="saveEditTransaction()">儲存修改</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -433,14 +505,33 @@
     
     document.getElementById('tx-date').valueAsDate = new Date();
 
+    // 更新後的科目分類
+    const expenseCategories = ['餐飲', '居住', '交通', '娛樂', '治裝', '通信', '學費', '貸款還款', '其他'];
+    const incomeCategories = ['薪資', '政府補助', '其他'];
+
     let transactions = JSON.parse(localStorage.getItem('my_transactions')) || [];
     let budgets = JSON.parse(localStorage.getItem('my_budgets')) || {
-        '餐飲': 0,
-        '居住': 0,
-        '交通': 0,
-        '娛樂': 0,
-        '其他': 0
+        '餐飲': 0, '居住': 0, '交通': 0, '娛樂': 0, '治裝': 0,
+        '通信': 0, '學費': 0, '貸款還款': 0, '其他': 0
     };
+
+    // 動態更新下拉選單
+    function updateCategoryOptions(typeSelectId, categorySelectId) {
+        const type = document.getElementById(typeSelectId).value;
+        const categorySelect = document.getElementById(categorySelectId);
+        categorySelect.innerHTML = '';
+        
+        const list = type === 'expense' ? expenseCategories : incomeCategories;
+        list.forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat;
+            opt.textContent = cat;
+            categorySelect.appendChild(opt);
+        });
+    }
+    
+    // 初始化新增選單與編輯選單的類別
+    updateCategoryOptions('tx-type', 'tx-category');
 
     function saveData() {
         localStorage.setItem('my_transactions', JSON.stringify(transactions));
@@ -470,7 +561,7 @@
         return 'NT$ ' + amount.toLocaleString();
     }
 
-    // 精準依日期範圍過濾 (完全累進，無加乘)
+    // 精準日期範圍過濾
     function filterTransactionsByRange(txList, view, offset = 0) {
         const now = new Date();
         
@@ -523,7 +614,6 @@
         let prevIncome = previousTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
         let prevSavings = prevIncome - prevExpense;
 
-        // 預算總額累進
         let totalMonthlyBudget = Object.values(budgets).reduce((a, b) => a + b, 0);
         let viewBudget = currentView === 'today' ? totalMonthlyBudget / 30 :
                          (currentView === 'week' ? totalMonthlyBudget / 4 : 
@@ -545,7 +635,6 @@
         renderCompare('compare-income', curIncome, prevIncome, compares[currentView], false);
         renderCompare('compare-savings', curSavings, prevSavings, compares[currentView], false);
 
-        // 渲染直方圖
         renderHistogram(currentTx, curExpense);
     }
 
@@ -566,13 +655,10 @@
         el.className = `kpi-compare ${colorClass}`;
     }
 
-    // 繪製直方圖
     function renderHistogram(txList, totalExpense) {
         const container = document.getElementById('histogram-list');
-        const categories = ['餐飲', '居住', '交通', '娛樂', '其他'];
-        
         let catTotals = {};
-        categories.forEach(c => catTotals[c] = 0);
+        expenseCategories.forEach(c => catTotals[c] = 0);
 
         txList.filter(t => t.type === 'expense').forEach(t => {
             if (catTotals[t.category] !== undefined) {
@@ -589,6 +675,7 @@
 
         container.innerHTML = '';
         for (let [cat, amount] of Object.entries(catTotals)) {
+            if (amount === 0) continue;
             let pct = totalExpense > 0 ? Math.round((amount / totalExpense) * 100) : 0;
             container.innerHTML += `
                 <div class="bar-chart-item">
@@ -625,6 +712,7 @@
         let currentMonthTx = filterTransactionsByRange(transactions, 'month', 0);
 
         for (let [cat, budget] of Object.entries(budgets)) {
+            if (budget === 0) continue;
             let spent = currentMonthTx.filter(t => t.type === 'expense' && t.category === cat).reduce((sum, t) => sum + t.amount, 0);
             let pct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0;
             container.innerHTML += `
@@ -657,9 +745,10 @@
                         <div>${t.desc}</div>
                         <div>${t.date} · ${t.category}</div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 4px;">
                         <span class="tx-amount ${t.type}">${t.type === 'income' ? '+' : '-'}${formatCurrency(t.amount)}</span>
-                        <button class="delete-btn" onclick="deleteTx(${t.id})">✕</button>
+                        <button class="action-btn edit-btn" onclick="openEditModal(${t.id})">✏️</button>
+                        <button class="action-btn delete-btn" onclick="deleteTx(${t.id})">✕</button>
                     </div>
                 </div>
             `;
@@ -685,11 +774,54 @@
         alert('新增成功！');
     }
 
-    function deleteTx(id) {
-        transactions = transactions.filter(t => t.id !== id);
+    // 編輯明細邏輯
+    function openEditModal(id) {
+        const t = transactions.find(item => item.id === id);
+        if (!t) return;
+
+        document.getElementById('edit-id').value = t.id;
+        document.getElementById('edit-date').value = t.date;
+        document.getElementById('edit-type').value = t.type;
+        
+        // 更新並同步編輯彈窗的科目選單
+        updateCategoryOptions('edit-type', 'edit-category');
+        document.getElementById('edit-category').value = t.category;
+        
+        document.getElementById('edit-desc').value = t.desc;
+        document.getElementById('edit-amount').value = t.amount;
+
+        document.getElementById('edit-modal').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+        document.getElementById('edit-modal').style.display = 'none';
+    }
+
+    function saveEditTransaction() {
+        const id = parseInt(document.getElementById('edit-id').value);
+        const index = transactions.findIndex(t => t.id === id);
+        if (index === -1) return;
+
+        transactions[index].date = document.getElementById('edit-date').value;
+        transactions[index].type = document.getElementById('edit-type').value;
+        transactions[index].category = document.getElementById('edit-category').value;
+        transactions[index].desc = document.getElementById('edit-desc').value;
+        transactions[index].amount = parseFloat(document.getElementById('edit-amount').value);
+
         saveData();
+        closeEditModal();
         updateDashboard();
         renderTransactions();
+        alert('修改成功！');
+    }
+
+    function deleteTx(id) {
+        if (confirm('確定要刪除這筆紀錄嗎？')) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveData();
+            updateDashboard();
+            renderTransactions();
+        }
     }
 
     updateDashboard();
