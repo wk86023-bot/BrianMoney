@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>個人收支財務報表 (支援明細編輯版)</title>
+    <title>個人收支財務報表</title>
     <style>
         :root {
             --primary: #4f46e5;
-            --primary-light: #e0e7ff;
             --success: #10b981;
-            --warning: #f59e0b;
             --danger: #ef4444;
             --bg: #f8fafc;
             --card-bg: #ffffff;
@@ -58,7 +56,6 @@
             font-weight: 600;
         }
 
-        /* 分頁導航 */
         .tabs {
             display: flex;
             background: #f1f5f9;
@@ -74,7 +71,6 @@
             font-weight: 500;
             color: var(--text-secondary);
             cursor: pointer;
-            transition: all 0.2s;
             text-align: center;
         }
 
@@ -99,7 +95,10 @@
             display: block;
         }
 
-        /* 週期切換開關 */
+        .search-box {
+            margin-bottom: 12px;
+        }
+
         .view-switch {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -107,7 +106,7 @@
             background: #f1f5f9;
             border-radius: 8px;
             padding: 3px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .view-btn {
@@ -151,27 +150,36 @@
             font-weight: 500;
         }
 
-        .compare-up {
-            color: var(--danger);
-        }
-
-        .compare-down {
-            color: var(--success);
-        }
+        .compare-up { color: var(--danger); }
+        .compare-down { color: var(--success); }
 
         .kpi-value {
             font-size: 1.25rem;
             font-weight: 700;
         }
 
-        /* 直方圖樣式 */
+        .progress-bar-bg {
+            background: #f1f5f9;
+            border-radius: 99px;
+            height: 8px;
+            width: 100%;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            background: var(--primary);
+            height: 100%;
+            border-radius: 99px;
+            transition: width 0.3s ease;
+        }
+
         .chart-container {
             background: white;
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 16px;
             margin-bottom: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
         }
 
         .chart-title {
@@ -182,7 +190,7 @@
         }
 
         .bar-chart-item {
-            margin-bottom: 8px;
+            margin-bottom: 12px;
         }
 
         .bar-info {
@@ -196,16 +204,22 @@
         .bar-bg {
             background: #f1f5f9;
             border-radius: 99px;
-            height: 10px;
+            height: 8px;
             width: 100%;
             overflow: hidden;
+            margin-bottom: 2px;
         }
 
-        .bar-fill {
+        .bar-fill-hist {
             background: var(--primary);
             height: 100%;
             border-radius: 99px;
-            transition: width 0.3s ease;
+        }
+
+        .bar-fill-budget {
+            background: #cbd5e1;
+            height: 100%;
+            border-radius: 99px;
         }
 
         .form-group {
@@ -229,9 +243,7 @@
             outline: none;
         }
 
-        .form-control:focus {
-            border-color: var(--primary);
-        }
+        .form-control:focus { border-color: var(--primary); }
 
         .btn {
             width: 100%;
@@ -246,13 +258,7 @@
             margin-top: 4px;
         }
 
-        .btn:active {
-            opacity: 0.9;
-        }
-
-        .btn-secondary {
-            background: #94a3b8;
-        }
+        .btn-secondary { background: #94a3b8; }
 
         .tx-item {
             display: flex;
@@ -263,41 +269,15 @@
             font-size: 0.85rem;
         }
 
-        .tx-info div:first-child {
-            font-weight: 600;
-        }
+        .tx-info div:first-child { font-weight: 600; }
+        .tx-info div:last-child { font-size: 0.75rem; color: var(--text-secondary); }
 
-        .tx-info div:last-child {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
+        .tx-amount.income { color: var(--success); font-weight: 600; }
+        .tx-amount.expense { color: var(--danger); font-weight: 600; }
 
-        .tx-amount.income {
-            color: var(--success);
-            font-weight: 600;
-        }
-
-        .tx-amount.expense {
-            color: var(--danger);
-            font-weight: 600;
-        }
-
-        .action-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 0.85rem;
-            padding: 4px;
-            margin-left: 4px;
-        }
-
-        .delete-btn {
-            color: var(--danger);
-        }
-
-        .edit-btn {
-            color: var(--primary);
-        }
+        .action-btn { background: none; border: none; cursor: pointer; font-size: 0.85rem; padding: 4px; margin-left: 4px; }
+        .delete-btn { color: var(--danger); }
+        .edit-btn { color: var(--primary); }
 
         .empty-hint {
             text-align: center;
@@ -306,7 +286,6 @@
             padding: 20px 0;
         }
 
-        /* 彈出編輯視窗 (Modal) */
         .modal-overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -326,12 +305,7 @@
             box-shadow: 0 10px 25px rgba(0,0,0,0.15);
         }
 
-        .modal-title {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 12px;
-            color: var(--text);
-        }
+        .modal-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; }
     </style>
 </head>
 <body>
@@ -341,7 +315,6 @@
         <h1>個人收支財務報表</h1>
     </header>
 
-    <!-- 分頁導航 -->
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab(0)">📊 統計</button>
         <button class="tab-btn" onclick="switchTab(1)">🎯 計畫</button>
@@ -349,8 +322,12 @@
     </div>
 
     <div class="content">
-        <!-- 1️⃣ 統計儀表板 (Dashboard & Histogram) -->
+        <!-- 統計頁面 -->
         <div id="tab-0" class="tab-pane active">
+            <div class="search-box">
+                <input type="text" id="stat-search" class="form-control" placeholder="🔍 搜尋說明或科目..." oninput="updateDashboard()">
+            </div>
+
             <div class="view-switch">
                 <button class="view-btn active" onclick="switchView('today')">今天</button>
                 <button class="view-btn" onclick="switchView('week')">本週</button>
@@ -359,9 +336,7 @@
             </div>
 
             <div class="kpi-card">
-                <div class="kpi-title">
-                    <span id="kpi-budget-title">本期預算參考</span>
-                </div>
+                <div class="kpi-title"><span id="kpi-budget-title">本期預算參考</span></div>
                 <div class="kpi-value" id="kpi-budget">NT$ 0</div>
             </div>
 
@@ -389,16 +364,15 @@
                 <div class="kpi-value" id="kpi-savings" style="color: var(--primary);">NT$ 0</div>
             </div>
 
-            <!-- 直方圖區塊 -->
             <div class="chart-container">
-                <div class="chart-title">📊 各類別支出直方圖 (本期)</div>
+                <div class="chart-title">📊 支出類別對比 (實支 vs 預算)</div>
                 <div id="histogram-list">
                     <div class="empty-hint" style="padding: 10px 0;">尚無支出數據</div>
                 </div>
             </div>
         </div>
 
-        <!-- 2️⃣ 收支計畫表 (Plan) -->
+        <!-- 計畫頁面 -->
         <div id="tab-1" class="tab-pane">
             <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">設定各類別月預算</h3>
             <div style="background: #f8fafc; padding: 12px; border-radius: 10px; margin-bottom: 16px;">
@@ -427,7 +401,7 @@
             <div id="budget-plan-list"></div>
         </div>
 
-        <!-- 3️⃣ 收支明細與新增 (Transactions) -->
+        <!-- 明細頁面 -->
         <div id="tab-2" class="tab-pane">
             <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">新增收支紀錄</h3>
             <form id="tx-form" onsubmit="addTransaction(event)" style="background: #f8fafc; padding: 12px; border-radius: 10px; margin-bottom: 16px;">
@@ -448,7 +422,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">項目說明</label>
-                    <input type="text" id="tx-desc" class="form-control" placeholder="例如：買衣服、電信費" required>
+                    <input type="text" id="tx-desc" class="form-control" placeholder="例如：午餐、薪水" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">金額 (NT$)</label>
@@ -457,14 +431,22 @@
                 <button type="submit" class="btn">新增紀錄</button>
             </form>
 
-            <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">近期流水帳</h3>
+            <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">明細流水帳與搜尋</h3>
+            <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+                <input type="date" id="filter-start-date" class="form-control" onchange="renderTransactions()">
+                <input type="date" id="filter-end-date" class="form-control" onchange="renderTransactions()">
+            </div>
+            <div style="margin-bottom: 12px;">
+                <input type="text" id="tx-search" class="form-control" placeholder="🔍 搜尋明細說明或科目..." oninput="renderTransactions()">
+            </div>
+
             <div id="tx-list">
                 <div class="empty-hint">目前尚無任何收支紀錄</div>
             </div>
         </div>
     </div>
 
-    <!-- ✏️ 彈出式修改明細視窗 (Modal) -->
+    <!-- 編輯視窗 -->
     <div id="edit-modal" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-title">修改收支紀錄</div>
@@ -502,10 +484,8 @@
 
 <script>
     let currentView = 'today';
-    
     document.getElementById('tx-date').valueAsDate = new Date();
 
-    // 更新後的科目分類
     const expenseCategories = ['餐飲', '居住', '交通', '娛樂', '治裝', '通信', '學費', '貸款還款', '其他'];
     const incomeCategories = ['薪資', '政府補助', '其他'];
 
@@ -515,12 +495,10 @@
         '通信': 0, '學費': 0, '貸款還款': 0, '其他': 0
     };
 
-    // 動態更新下拉選單
     function updateCategoryOptions(typeSelectId, categorySelectId) {
         const type = document.getElementById(typeSelectId).value;
         const categorySelect = document.getElementById(categorySelectId);
         categorySelect.innerHTML = '';
-        
         const list = type === 'expense' ? expenseCategories : incomeCategories;
         list.forEach(cat => {
             const opt = document.createElement('option');
@@ -529,8 +507,6 @@
             categorySelect.appendChild(opt);
         });
     }
-    
-    // 初始化新增選單與編輯選單的類別
     updateCategoryOptions('tx-type', 'tx-category');
 
     function saveData() {
@@ -561,10 +537,8 @@
         return 'NT$ ' + amount.toLocaleString();
     }
 
-    // 精準日期範圍過濾
     function filterTransactionsByRange(txList, view, offset = 0) {
         const now = new Date();
-        
         return txList.filter(t => {
             const d = new Date(t.date);
             if (isNaN(d)) return false;
@@ -575,26 +549,21 @@
                 return d.getFullYear() === targetDate.getFullYear() &&
                        d.getMonth() === targetDate.getMonth() &&
                        d.getDate() === targetDate.getDate();
-            } 
-            else if (view === 'week') {
+            } else if (view === 'week') {
                 const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1;
                 const startOfWeek = new Date(now);
                 startOfWeek.setDate(now.getDate() - dayOfWeek + (offset * 7));
                 startOfWeek.setHours(0,0,0,0);
-
                 const endOfWeek = new Date(startOfWeek);
                 endOfWeek.setDate(startOfWeek.getDate() + 6);
                 endOfWeek.setHours(23,59,59,999);
-
                 return d >= startOfWeek && d <= endOfWeek;
-            } 
-            else if (view === 'month') {
+            } else if (view === 'month') {
                 const targetYear = now.getFullYear();
                 const targetMonth = now.getMonth() + offset;
                 const checkDate = new Date(targetYear, targetMonth, 1);
                 return d.getFullYear() === checkDate.getFullYear() && d.getMonth() === checkDate.getMonth();
-            } 
-            else if (view === 'year') {
+            } else if (view === 'year') {
                 const targetYear = now.getFullYear() + offset;
                 return d.getFullYear() === targetYear;
             }
@@ -605,6 +574,11 @@
     function updateDashboard() {
         let currentTx = filterTransactionsByRange(transactions, currentView, 0);
         let previousTx = filterTransactionsByRange(transactions, currentView, -1);
+
+        const keyword = document.getElementById('stat-search').value.toLowerCase().trim();
+        if (keyword) {
+            currentTx = currentTx.filter(t => t.desc.toLowerCase().includes(keyword) || t.category.toLowerCase().includes(keyword));
+        }
 
         let curExpense = currentTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
         let curIncome = currentTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
@@ -635,7 +609,7 @@
         renderCompare('compare-income', curIncome, prevIncome, compares[currentView], false);
         renderCompare('compare-savings', curSavings, prevSavings, compares[currentView], false);
 
-        renderHistogram(currentTx, curExpense);
+        renderHistogram(currentTx);
     }
 
     function renderCompare(elementId, cur, prev, label, isExpense) {
@@ -646,16 +620,14 @@
             el.className = 'kpi-compare';
             return;
         }
-
         let sign = diff > 0 ? '+' : '';
         let isGood = isExpense ? diff < 0 : diff > 0;
         let colorClass = diff === 0 ? '' : (isGood ? 'compare-down' : 'compare-up');
-
         el.innerHTML = `與${label}相比 ${sign}${formatCurrency(diff)}`;
         el.className = `kpi-compare ${colorClass}`;
     }
 
-    function renderHistogram(txList, totalExpense) {
+    function renderHistogram(txList) {
         const container = document.getElementById('histogram-list');
         let catTotals = {};
         expenseCategories.forEach(c => catTotals[c] = 0);
@@ -668,23 +640,38 @@
             }
         });
 
-        if (totalExpense === 0) {
+        const hasExpense = Object.values(catTotals).some(v => v > 0);
+        if (!hasExpense) {
             container.innerHTML = `<div class="empty-hint" style="padding: 10px 0;">本期尚無支出數據</div>`;
             return;
         }
 
+        const ratio = currentView === 'today' ? 1/30 : (currentView === 'week' ? 1/4 : (currentView === 'year' ? 12 : 1));
+
         container.innerHTML = '';
         for (let [cat, amount] of Object.entries(catTotals)) {
-            if (amount === 0) continue;
-            let pct = totalExpense > 0 ? Math.round((amount / totalExpense) * 100) : 0;
+            let catBudget = (budgets[cat] || 0) * ratio;
+            if (amount === 0 && catBudget === 0) continue;
+
+            let maxVal = Math.max(amount, catBudget, 1);
+            let amtPct = Math.round((amount / maxVal) * 100);
+            let bgtPct = Math.round((catBudget / maxVal) * 100);
+            let diff = catBudget - amount;
+
             container.innerHTML += `
                 <div class="bar-chart-item">
                     <div class="bar-info">
-                        <span>${cat}</span>
-                        <span>${formatCurrency(amount)} (${pct}%)</span>
+                        <span style="font-weight: 600;">${cat}</span>
+                        <span>實支: ${formatCurrency(amount)} / 預算: ${formatCurrency(Math.round(catBudget))}</span>
                     </div>
-                    <div class="bar-bg">
-                        <div class="bar-fill" style="width: ${pct}%;"></div>
+                    <div class="bar-bg" title="實際支出">
+                        <div class="bar-fill-hist" style="width: ${amtPct}%; background: ${amount > catBudget && catBudget > 0 ? 'var(--danger)' : 'var(--primary)'};"></div>
+                    </div>
+                    <div class="bar-bg" title="預算基準" style="height: 5px;">
+                        <div class="bar-fill-budget" style="width: ${bgtPct}%;"></div>
+                    </div>
+                    <div style="font-size: 0.7rem; color: var(--text-secondary); text-align: right; margin-top: 1px;">
+                        ${catBudget > 0 ? (diff >= 0 ? `剩餘 ${formatCurrency(Math.round(diff))}` : `超支 ${formatCurrency(Math.abs(Math.round(diff)))}`) : '未設預算'}
                     </div>
                 </div>
             `;
@@ -715,11 +702,16 @@
             if (budget === 0) continue;
             let spent = currentMonthTx.filter(t => t.type === 'expense' && t.category === cat).reduce((sum, t) => sum + t.amount, 0);
             let pct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0;
+            let diff = budget - spent;
+
             container.innerHTML += `
                 <div class="kpi-card">
                     <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">
                         <span>${cat}</span>
-                        <span>${formatCurrency(spent)} / ${formatCurrency(budget)}</span>
+                        <span>${pct}% (剩餘 ${formatCurrency(diff)})</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px;">
+                        已花費 ${formatCurrency(spent)} / 總預算 ${formatCurrency(budget)}
                     </div>
                     <div class="progress-bar-bg">
                         <div class="progress-bar-fill" style="width: ${pct}%; background: ${pct > 90 ? 'var(--danger)' : 'var(--primary)'};"></div>
@@ -731,13 +723,22 @@
 
     function renderTransactions() {
         const list = document.getElementById('tx-list');
-        if (transactions.length === 0) {
-            list.innerHTML = `<div class="empty-hint">目前尚無任何收支紀錄</div>`;
+        const startDate = document.getElementById('filter-start-date').value;
+        const endDate = document.getElementById('filter-end-date').value;
+        const keyword = document.getElementById('tx-search').value.toLowerCase().trim();
+
+        let filteredTx = [...transactions];
+        if (startDate) filteredTx = filteredTx.filter(t => t.date >= startDate);
+        if (endDate) filteredTx = filteredTx.filter(t => t.date <= endDate);
+        if (keyword) filteredTx = filteredTx.filter(t => t.desc.toLowerCase().includes(keyword) || t.category.toLowerCase().includes(keyword));
+
+        if (filteredTx.length === 0) {
+            list.innerHTML = `<div class="empty-hint">沒有找到符合條件的收支紀錄</div>`;
             return;
         }
-        list.innerHTML = '';
-        let sortedTx = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
 
+        list.innerHTML = '';
+        let sortedTx = filteredTx.sort((a, b) => new Date(b.date) - new Date(a.date));
         sortedTx.forEach(t => {
             list.innerHTML += `
                 <div class="tx-item">
@@ -765,31 +766,23 @@
 
         transactions.push({ id: Date.now(), date, type, category, desc, amount });
         saveData();
-        
         document.getElementById('tx-desc').value = '';
         document.getElementById('tx-amount').value = '';
-        
         updateDashboard();
         renderTransactions();
         alert('新增成功！');
     }
 
-    // 編輯明細邏輯
     function openEditModal(id) {
         const t = transactions.find(item => item.id === id);
         if (!t) return;
-
         document.getElementById('edit-id').value = t.id;
         document.getElementById('edit-date').value = t.date;
         document.getElementById('edit-type').value = t.type;
-        
-        // 更新並同步編輯彈窗的科目選單
         updateCategoryOptions('edit-type', 'edit-category');
         document.getElementById('edit-category').value = t.category;
-        
         document.getElementById('edit-desc').value = t.desc;
         document.getElementById('edit-amount').value = t.amount;
-
         document.getElementById('edit-modal').style.display = 'flex';
     }
 
