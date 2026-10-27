@@ -165,6 +165,7 @@
             width: 100%;
             margin-top: 8px;
             overflow: hidden;
+            display: block;
         }
 
         .progress-bar-fill {
@@ -208,6 +209,7 @@
             width: 100%;
             overflow: hidden;
             margin-bottom: 2px;
+            display: block;
         }
 
         .bar-fill-hist {
@@ -258,7 +260,8 @@
             margin-top: 4px;
         }
 
-        .btn-secondary { background: #94a3b8; }
+        .btn-secondary { background: #64748b; }
+        .btn-success { background: var(--success); }
 
         .tx-item {
             display: flex;
@@ -369,6 +372,12 @@
                 <div id="histogram-list">
                     <div class="empty-hint" style="padding: 10px 0;">尚無支出數據</div>
                 </div>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);">
+                <button type="button" class="btn btn-secondary" onclick="exportData()" style="font-size: 0.8rem; padding: 8px;">💾 備份匯出</button>
+                <button type="button" class="btn btn-success" onclick="document.getElementById('import-file').click()" style="font-size: 0.8rem; padding: 8px;">📂 還原匯入</button>
+                <input type="file" id="import-file" style="display: none;" accept=".json" onchange="importData(event)">
             </div>
         </div>
 
@@ -512,6 +521,46 @@
     function saveData() {
         localStorage.setItem('my_transactions', JSON.stringify(transactions));
         localStorage.setItem('my_budgets', JSON.stringify(budgets));
+    }
+
+    function exportData() {
+        const data = {
+            transactions: transactions,
+            budgets: budgets,
+            exportDate: new Date().toISOString()
+        };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `finance_backup_${new Date().toISOString().split('T')[0]}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    }
+
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const imported = JSON.parse(e.target.result);
+                if (imported.transactions && imported.budgets) {
+                    transactions = imported.transactions;
+                    budgets = imported.budgets;
+                    saveData();
+                    updateDashboard();
+                    renderBudgetPlan();
+                    renderTransactions();
+                    alert('資料還原成功！');
+                } else {
+                    alert('檔案格式錯誤！');
+                }
+            } catch (err) {
+                alert('無法解析此備份檔案！');
+            }
+        };
+        reader.readAsText(file);
     }
 
     function switchTab(index) {
