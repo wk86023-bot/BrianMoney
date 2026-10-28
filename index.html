@@ -64,10 +64,10 @@
 
         .tab-btn {
             flex: 1;
-            padding: 12px 8px;
+            padding: 12px 4px;
             border: none;
             background: none;
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             font-weight: 500;
             color: var(--text-secondary);
             cursor: pointer;
@@ -262,6 +262,7 @@
 
         .btn-secondary { background: #64748b; }
         .btn-success { background: var(--success); }
+        .btn-danger { background: var(--danger); font-size: 0.75rem; padding: 4px 8px; margin-top: 0; width: auto; }
 
         .tx-item {
             display: flex;
@@ -320,8 +321,9 @@
 
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab(0)">📊 統計</button>
-        <button class="tab-btn" onclick="switchTab(1)">🎯 計畫</button>
-        <button class="tab-btn" onclick="switchTab(2)">📝 明細</button>
+        <button class="tab-btn" onclick="switchTab(1)">🎯 每月支出</button>
+        <button class="tab-btn" onclick="switchTab(2)">💰 存款計畫</button>
+        <button class="tab-btn" onclick="switchTab(3)">📝 明細</button>
     </div>
 
     <div class="content">
@@ -385,10 +387,14 @@
             </div>
         </div>
 
-        <!-- 計畫頁面 -->
+        <!-- 每月支出頁面 -->
         <div id="tab-1" class="tab-pane">
-            <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">設定各類別月預算</h3>
+            <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">設定指定月份預算</h3>
             <div style="background: #f8fafc; padding: 12px; border-radius: 10px; margin-bottom: 16px;">
+                <div class="form-group">
+                    <label class="form-label">選擇月份</label>
+                    <input type="month" id="budget-month-picker" class="form-control" onchange="renderBudgetPlan()">
+                </div>
                 <div class="form-group">
                     <label class="form-label">選擇支出類別</label>
                     <select id="budget-category" class="form-control">
@@ -407,15 +413,44 @@
                     <label class="form-label">設定預算金額 (NT$)</label>
                     <input type="number" id="budget-amount" class="form-control" placeholder="請輸入金額" required>
                 </div>
-                <button type="button" class="btn" onclick="updateBudget()">儲存/更新預算</button>
+                <button type="button" class="btn" onclick="updateMonthlyBudget()">儲存該月預算</button>
             </div>
 
-            <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">目前預算執行狀況 (本月)</h3>
+            <h3 id="budget-plan-title" style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">預算執行狀況</h3>
             <div id="budget-plan-list"></div>
         </div>
 
-        <!-- 明細頁面 -->
+        <!-- 存款計畫頁面 -->
         <div id="tab-2" class="tab-pane">
+            <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">新增存款目標</h3>
+            <form id="goal-form" onsubmit="addSavingsGoal(event)" style="background: #f8fafc; padding: 12px; border-radius: 10px; margin-bottom: 16px;">
+                <div class="form-group">
+                    <label class="form-label">目標名稱</label>
+                    <input type="text" id="goal-name" class="form-control" placeholder="例如：買車基金、日本旅遊" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">目前已存金額 (NT$)</label>
+                    <input type="number" id="goal-current" class="form-control" placeholder="0" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">總目標金額 (NT$)</label>
+                    <input type="number" id="goal-target" class="form-control" placeholder="100000" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">預計達成年月</label>
+                    <input type="month" id="goal-date" class="form-control" required>
+                </div>
+                <button type="submit" class="btn">新增存款計畫</button>
+            </form>
+
+            <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">我的存款計畫列表</h3>
+            <div id="savings-goal-list">
+                <div class="empty-hint">目前尚無任何存款計畫</div>
+            </div>
+        </div>
+
+        <!-- 明細頁面 -->
+        <div id="tab-3" class="tab-pane">
             <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">新增收支紀錄</h3>
             <form id="tx-form" onsubmit="addTransaction(event)" style="background: #f8fafc; padding: 12px; border-radius: 10px; margin-bottom: 16px;">
                 <div class="form-group">
@@ -459,7 +494,7 @@
         </div>
     </div>
 
-    <!-- 編輯視窗 -->
+    <!-- 編輯收支視窗 -->
     <div id="edit-modal" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-title">修改收支紀錄</div>
@@ -493,20 +528,52 @@
             </div>
         </div>
     </div>
+
+    <!-- 編輯存款計畫視窗 -->
+    <div id="edit-goal-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-title">修改存款計畫</div>
+            <input type="hidden" id="edit-goal-id">
+            <div class="form-group">
+                <label class="form-label">目標名稱</label>
+                <input type="text" id="edit-goal-name" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">目前已存金額 (NT$)</label>
+                <input type="number" id="edit-goal-current" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">總目標金額 (NT$)</label>
+                <input type="number" id="edit-goal-target" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">預計達成年月</label>
+                <input type="month" id="edit-goal-date" class="form-control" required>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeEditGoalModal()">取消</button>
+                <button type="button" class="btn" onclick="saveEditGoal()">儲存修改</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
     let currentView = 'today';
     document.getElementById('tx-date').valueAsDate = new Date();
+    
+    // 初始化預設月曆選擇器為當前月份
+    const nowForInput = new Date();
+    const currentYearMonth = `${nowForInput.getFullYear()}-${String(nowForInput.getMonth() + 1).padStart(2, '0')}`;
+    document.getElementById('budget-month-picker').value = currentYearMonth;
 
     const expenseCategories = ['餐飲', '居住', '交通', '娛樂', '治裝', '通信', '學費', '貸款還款', '其他'];
     const incomeCategories = ['薪資', '政府補助', '其他'];
 
     let transactions = JSON.parse(localStorage.getItem('my_transactions')) || [];
-    let budgets = JSON.parse(localStorage.getItem('my_budgets')) || {
-        '餐飲': 0, '居住': 0, '交通': 0, '娛樂': 0, '治裝': 0,
-        '通信': 0, '學費': 0, '貸款還款': 0, '其他': 0
-    };
+    // 支援依月份記錄的預算結構： { '2026-10': { '餐飲': 5000, ... }, '2026-11': { ... } }
+    let monthlyBudgets = JSON.parse(localStorage.getItem('my_monthly_budgets')) || {};
+    let savingsGoals = JSON.parse(localStorage.getItem('my_savings_goals')) || [];
 
     function updateCategoryOptions(typeSelectId, categorySelectId) {
         const type = document.getElementById(typeSelectId).value;
@@ -524,7 +591,8 @@
 
     function saveData() {
         localStorage.setItem('my_transactions', JSON.stringify(transactions));
-        localStorage.setItem('my_budgets', JSON.stringify(budgets));
+        localStorage.setItem('my_monthly_budgets', JSON.stringify(monthlyBudgets));
+        localStorage.setItem('my_savings_goals', JSON.stringify(savingsGoals));
         
         let lastBackup = localStorage.getItem('last_backup_date');
         let now = new Date().getTime();
@@ -537,7 +605,8 @@
     function exportData() {
         const data = {
             transactions: transactions,
-            budgets: budgets,
+            monthlyBudgets: monthlyBudgets,
+            savingsGoals: savingsGoals,
             exportDate: new Date().toISOString()
         };
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
@@ -560,12 +629,14 @@
         reader.onload = function(e) {
             try {
                 const imported = JSON.parse(e.target.result);
-                if (imported.transactions && imported.budgets) {
+                if (imported.transactions) {
                     transactions = imported.transactions;
-                    budgets = imported.budgets;
+                    monthlyBudgets = imported.monthlyBudgets || imported.budgets || {};
+                    savingsGoals = imported.savingsGoals || [];
                     saveData();
                     updateDashboard();
                     renderBudgetPlan();
+                    renderSavingsGoals();
                     renderTransactions();
                     alert('資料還原成功！');
                 } else {
@@ -587,7 +658,8 @@
         });
         if (index === 0) updateDashboard();
         if (index === 1) renderBudgetPlan();
-        if (index === 2) renderTransactions();
+        if (index === 2) renderSavingsGoals();
+        if (index === 3) renderTransactions();
     }
 
     function switchView(view) {
@@ -635,6 +707,14 @@
         });
     }
 
+    // 取得指定月份的預算物件（若該月沒設定過，預設全部為 0）
+    function getBudgetForMonth(yearMonthStr) {
+        return monthlyBudgets[yearMonthStr] || {
+            '餐飲': 0, '居住': 0, '交通': 0, '娛樂': 0, '治裝': 0,
+            '通信': 0, '學費': 0, '貸款還款': 0, '其他': 0
+        };
+    }
+
     function updateDashboard() {
         let currentTx = filterTransactionsByRange(transactions, currentView, 0);
         let previousTx = filterTransactionsByRange(transactions, currentView, -1);
@@ -652,7 +732,12 @@
         let prevIncome = previousTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
         let prevSavings = prevIncome - prevExpense;
 
-        let totalMonthlyBudget = Object.values(budgets).reduce((a, b) => a + b, 0);
+        // 取得當前檢視月份的預算總額
+        const now = new Date();
+        const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const activeBudgetMap = getBudgetForMonth(curYM);
+        let totalMonthlyBudget = Object.values(activeBudgetMap).reduce((a, b) => a + b, 0);
+
         let viewBudget = currentView === 'today' ? totalMonthlyBudget / 30 :
                          (currentView === 'week' ? totalMonthlyBudget / 4 : 
                          (currentView === 'year' ? totalMonthlyBudget * 12 : totalMonthlyBudget));
@@ -673,7 +758,7 @@
         renderCompare('compare-income', curIncome, prevIncome, compares[currentView], false);
         renderCompare('compare-savings', curSavings, prevSavings, compares[currentView], false);
 
-        renderHistogram(currentTx);
+        renderHistogram(currentTx, activeBudgetMap);
     }
 
     function renderCompare(elementId, cur, prev, label, isExpense) {
@@ -691,7 +776,7 @@
         el.className = `kpi-compare ${colorClass}`;
     }
 
-    function renderHistogram(txList) {
+    function renderHistogram(txList, activeBudgetMap) {
         const container = document.getElementById('histogram-list');
         let catTotals = {};
         expenseCategories.forEach(c => catTotals[c] = 0);
@@ -714,7 +799,7 @@
 
         container.innerHTML = '';
         for (let [cat, amount] of Object.entries(catTotals)) {
-            let catBudget = (budgets[cat] || 0) * ratio;
+            let catBudget = (activeBudgetMap[cat] || 0) * ratio;
             if (amount === 0 && catBudget === 0) continue;
 
             let maxVal = Math.max(amount, catBudget, 1);
@@ -742,29 +827,51 @@
         }
     }
 
-    function updateBudget() {
+    function updateMonthlyBudget() {
+        const monthVal = document.getElementById('budget-month-picker').value;
+        if (!monthVal) {
+            alert('請選擇有效的月份！');
+            return;
+        }
         const cat = document.getElementById('budget-category').value;
         const amount = parseFloat(document.getElementById('budget-amount').value);
         if (isNaN(amount) || amount < 0) {
             alert('請輸入有效的金額！');
             return;
         }
-        budgets[cat] = amount;
+
+        if (!monthlyBudgets[monthVal]) {
+            monthlyBudgets[monthVal] = {
+                '餐飲': 0, '居住': 0, '交通': 0, '娛樂': 0, '治裝': 0,
+                '通信': 0, '學費': 0, '貸款還款': 0, '其他': 0
+            };
+        }
+        monthlyBudgets[monthVal][cat] = amount;
         saveData();
         document.getElementById('budget-amount').value = '';
         renderBudgetPlan();
         updateDashboard();
-        alert(`已成功更新【${cat}】月預算！`);
+        alert(`已成功更新【${monthVal}】的【${cat}】月預算！`);
     }
 
     function renderBudgetPlan() {
+        const selectedMonth = document.getElementById('budget-month-picker').value;
+        document.getElementById('budget-plan-title').innerText = `${selectedMonth} 預算執行狀況`;
+        
         const container = document.getElementById('budget-plan-list');
         container.innerHTML = '';
-        let currentMonthTx = filterTransactionsByRange(transactions, 'month', 0);
+        
+        const budgetMap = getBudgetForMonth(selectedMonth);
 
-        for (let [cat, budget] of Object.entries(budgets)) {
+        // 過濾出該月份的收支明細來計算已花費金額
+        let monthTx = transactions.filter(t => {
+            if (t.type !== 'expense') return false;
+            return t.date.startsWith(selectedMonth);
+        });
+
+        for (let [cat, budget] of Object.entries(budgetMap)) {
             if (budget === 0) continue;
-            let spent = currentMonthTx.filter(t => t.type === 'expense' && t.category === cat).reduce((sum, t) => sum + t.amount, 0);
+            let spent = monthTx.filter(t => t.category === cat).reduce((sum, t) => sum + t.amount, 0);
             let pct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0;
             let diff = budget - spent;
 
@@ -782,6 +889,113 @@
                     </div>
                 </div>
             `;
+        }
+
+        if (Object.values(budgetMap).every(v => v === 0)) {
+            container.innerHTML = `<div class="empty-hint">此月份尚未設定任何預算</div>`;
+        }
+    }
+
+    // 存款計畫相關函式
+    function addSavingsGoal(e) {
+        e.preventDefault();
+        const name = document.getElementById('goal-name').value.trim();
+        const current = parseFloat(document.getElementById('goal-current').value);
+        const target = parseFloat(document.getElementById('goal-target').value);
+        const date = document.getElementById('goal-date').value;
+
+        if (isNaN(current) || isNaN(target) || target <= 0) {
+            alert('請輸入有效的金額！');
+            return;
+        }
+
+        savingsGoals.push({
+            id: Date.now(),
+            name,
+            current,
+            target,
+            date
+        });
+
+        saveData();
+        document.getElementById('goal-name').value = '';
+        document.getElementById('goal-current').value = '';
+        document.getElementById('goal-target').value = '';
+        document.getElementById('goal-date').value = '';
+        renderSavingsGoals();
+        alert('新增存款計畫成功！');
+    }
+
+    function renderSavingsGoals() {
+        const container = document.getElementById('savings-goal-list');
+        if (savingsGoals.length === 0) {
+            container.innerHTML = `<div class="empty-hint">目前尚無任何存款計畫</div>`;
+            return;
+        }
+
+        container.innerHTML = '';
+        savingsGoals.forEach(g => {
+            let pct = Math.min(Math.round((g.current / g.target) * 100), 100);
+            container.innerHTML += `
+                <div class="kpi-card">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 600; margin-bottom: 4px;">
+                        <span>${g.name}</span>
+                        <span style="color: var(--primary);">${pct}%</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">
+                        已存 ${formatCurrency(g.current)} / 目標 ${formatCurrency(g.target)}
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px;">
+                        🎯 預計達成年月：${g.date}
+                    </div>
+                    <div class="progress-bar-bg" style="margin-bottom: 8px;">
+                        <div class="progress-bar-fill" style="width: ${pct}%;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 4px;">
+                        <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; margin-top: 0; width: auto;" onclick="openEditGoalModal(${g.id})">編輯</button>
+                        <button type="button" class="btn btn-danger" onclick="deleteGoal(${g.id})">刪除</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    function openEditGoalModal(id) {
+        const g = savingsGoals.find(item => item.id === id);
+        if (!g) return;
+        document.getElementById('edit-goal-id').value = g.id;
+        document.getElementById('edit-goal-name').value = g.name;
+        document.getElementById('edit-goal-current').value = g.current;
+        document.getElementById('edit-goal-target').value = g.target;
+        document.getElementById('edit-goal-date').value = g.date;
+        document.getElementById('edit-goal-modal').style.display = 'flex';
+    }
+
+    function closeEditGoalModal() {
+        document.getElementById('edit-goal-modal').style.display = 'none';
+    }
+
+    function saveEditGoal() {
+        const id = parseInt(document.getElementById('edit-goal-id').value);
+        const index = savingsGoals.findIndex(g => g.id === id);
+        if (index === -1) return;
+
+        savingsGoals[index].name = document.getElementById('edit-goal-name').value.trim();
+        savingsGoals[index].current = parseFloat(document.getElementById('edit-goal-current').value);
+        savingsGoals[index].target = parseFloat(document.getElementById('edit-goal-target').value);
+        savingsGoals[index].date = document.getElementById('edit-goal-date').value;
+
+        saveData();
+        closeEditGoalModal();
+        renderSavingsGoals();
+        alert('修改存款計畫成功！');
+    }
+
+    function deleteGoal(id) {
+        if (confirm('確定要刪除這個存款計畫嗎？')) {
+            savingsGoals = savingsGoals.filter(g => g.id !== id);
+            saveData();
+            renderSavingsGoals();
         }
     }
 
