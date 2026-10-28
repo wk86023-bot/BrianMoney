@@ -391,12 +391,14 @@
         <div id="tab-1" class="tab-pane">
             <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">設定指定月份預算</h3>
             <div style="background: #f8fafc; padding: 12px; border-radius: 10px; margin-bottom: 16px;">
-                <div class="form-group" style="display: flex; gap: 8px; align-items: flex-end;">
+                <div class="form-group" style="display: flex; gap: 8px;">
                     <div style="flex: 1;">
                         <label class="form-label">選擇月份</label>
                         <input type="month" id="budget-month-picker" class="form-control" onchange="renderBudgetPlan()">
                     </div>
-                    <button type="button" class="btn btn-secondary" onclick="copyLastMonthBudget()" style="font-size: 0.75rem; padding: 9px 10px; margin-top: 0; width: auto; white-space: nowrap;">📋 複製前月</button>
+                    <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end;">
+                        <button type="button" class="btn btn-secondary" onclick="copyLastMonthBudget()" style="margin-top: 0; width: 100%; height: 38px; font-size: 0.8rem;">📋 複製前月</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">選擇支出類別</label>
@@ -442,8 +444,8 @@
                     <input type="text" id="goal-name" class="form-control" placeholder="例如：買車基金、日本旅遊" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">目前已存金額 (NT$)</label>
-                    <input type="number" id="goal-current" class="form-control" placeholder="0" required>
+                    <label class="form-label">目前已存金額 (自動帶入總淨儲蓄)</label>
+                    <input type="text" id="goal-current-display" class="form-control" style="background: #f1f5f9; color: var(--primary); font-weight: 600;" readonly>
                 </div>
                 <div class="form-group">
                     <label class="form-label">總目標金額 (NT$)</label>
@@ -552,8 +554,8 @@
                 <input type="text" id="edit-goal-name" class="form-control" required>
             </div>
             <div class="form-group">
-                <label class="form-label">目前已存金額 (NT$)</label>
-                <input type="number" id="edit-goal-current" class="form-control" required>
+                <label class="form-label">目前已存金額 (自動帶入總淨儲蓄)</label>
+                <input type="text" id="edit-goal-current-display" class="form-control" style="background: #f1f5f9; color: var(--primary); font-weight: 600;" readonly>
             </div>
             <div class="form-group">
                 <label class="form-label">總目標金額 (NT$)</label>
@@ -682,6 +684,13 @@
 
     function formatCurrency(amount) {
         return 'NT$ ' + amount.toLocaleString();
+    }
+
+    // 計算跨年度的所有歷史總淨儲蓄 (總收入 - 總支出)
+    function getTotalLifetimeSavings() {
+        let totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+        let totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+        return totalIncome - totalExpense;
     }
 
     function filterTransactionsByRange(txList, view, offset = 0) {
@@ -948,19 +957,18 @@
     function addSavingsGoal(e) {
         e.preventDefault();
         const name = document.getElementById('goal-name').value.trim();
-        const current = parseFloat(document.getElementById('goal-current').value);
+        const current = getTotalLifetimeSavings(); // 自動代入跨年度總淨儲蓄
         const target = parseFloat(document.getElementById('goal-target').value);
         const date = document.getElementById('goal-date').value;
 
-        if (isNaN(current) || isNaN(target) || target <= 0) {
-            alert('請輸入有效的金額！');
+        if (isNaN(target) || target <= 0) {
+            alert('請輸入有效的總目標金額！');
             return;
         }
 
         savingsGoals.push({ id: Date.now(), name, current, target, date });
         saveData();
         document.getElementById('goal-name').value = '';
-        document.getElementById('goal-current').value = '';
         document.getElementById('goal-target').value = '';
         document.getElementById('goal-date').value = '';
         renderSavingsGoals();
@@ -968,6 +976,10 @@
     }
 
     function renderSavingsGoals() {
+        // 自動更新新增表單中的目前已存金額為最新總淨儲蓄
+        const currentLifetimeSavings = getTotalLifetimeSavings();
+        document.getElementById('goal-current-display').value = formatCurrency(currentLifetimeSavings);
+
         const container = document.getElementById('savings-goal-list');
         if (savingsGoals.length === 0) {
             container.innerHTML = `<div class="empty-hint">目前尚無任何存款計畫</div>`;
@@ -976,7 +988,10 @@
 
         container.innerHTML = '';
         savingsGoals.forEach(g => {
+            // 讓現有計畫也能同步抓取最新累積的淨儲蓄金額
+            g.current = currentLifetimeSavings;
             let pct = Math.min(Math.round((g.current / g.target) * 100), 100);
+
             container.innerHTML += `
                 <div class="kpi-card">
                     <div style="display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 600; margin-bottom: 4px;">
@@ -1006,7 +1021,7 @@
         if (!g) return;
         document.getElementById('edit-goal-id').value = g.id;
         document.getElementById('edit-goal-name').value = g.name;
-        document.getElementById('edit-goal-current').value = g.current;
+        document.getElementById('edit-goal-current-display').value = formatCurrency(getTotalLifetimeSavings());
         document.getElementById('edit-goal-target').value = g.target;
         document.getElementById('edit-goal-date').value = g.date;
         document.getElementById('edit-goal-modal').style.display = 'flex';
@@ -1022,7 +1037,7 @@
         if (index === -1) return;
 
         savingsGoals[index].name = document.getElementById('edit-goal-name').value.trim();
-        savingsGoals[index].current = parseFloat(document.getElementById('edit-goal-current').value);
+        savingsGoals[index].current = getTotalLifetimeSavings(); // 自動保持最新淨儲蓄
         savingsGoals[index].target = parseFloat(document.getElementById('edit-goal-target').value);
         savingsGoals[index].date = document.getElementById('edit-goal-date').value;
 
