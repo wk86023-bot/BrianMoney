@@ -391,9 +391,12 @@
         <div id="tab-1" class="tab-pane">
             <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">設定指定月份預算</h3>
             <div style="background: #f8fafc; padding: 12px; border-radius: 10px; margin-bottom: 16px;">
-                <div class="form-group">
-                    <label class="form-label">選擇月份</label>
-                    <input type="month" id="budget-month-picker" class="form-control" onchange="renderBudgetPlan()">
+                <div class="form-group" style="display: flex; gap: 8px; align-items: flex-end;">
+                    <div style="flex: 1;">
+                        <label class="form-label">選擇月份</label>
+                        <input type="month" id="budget-month-picker" class="form-control" onchange="renderBudgetPlan()">
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="copyLastMonthBudget()" style="font-size: 0.75rem; padding: 9px 10px; margin-top: 0; width: auto; white-space: nowrap;">📋 複製前月</button>
                 </div>
                 <div class="form-group">
                     <label class="form-label">選擇支出類別</label>
@@ -416,7 +419,17 @@
                 <button type="button" class="btn" onclick="updateMonthlyBudget()">儲存該月預算</button>
             </div>
 
-            <h3 id="budget-plan-title" style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">預算執行狀況</h3>
+            <div id="budget-summary-header" class="kpi-card" style="background: #eef2ff; border-color: #c7d2fe; display: none;">
+                <div class="kpi-title" style="color: var(--primary); font-weight: 600;">
+                    <span id="budget-plan-title">預算執行狀況</span>
+                    <span id="budget-total-percent">0%</span>
+                </div>
+                <div class="kpi-value" id="budget-total-summary" style="font-size: 1rem; color: var(--text);">已花費 NT$ 0 / 總預算 NT$ 0</div>
+                <div class="progress-bar-bg" style="margin-top: 6px;">
+                    <div id="budget-total-progress" class="progress-bar-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+
             <div id="budget-plan-list"></div>
         </div>
 
@@ -562,7 +575,6 @@
     let currentView = 'today';
     document.getElementById('tx-date').valueAsDate = new Date();
     
-    // 初始化預設月曆選擇器為當前月份
     const nowForInput = new Date();
     const currentYearMonth = `${nowForInput.getFullYear()}-${String(nowForInput.getMonth() + 1).padStart(2, '0')}`;
     document.getElementById('budget-month-picker').value = currentYearMonth;
@@ -571,7 +583,6 @@
     const incomeCategories = ['薪資', '政府補助', '其他'];
 
     let transactions = JSON.parse(localStorage.getItem('my_transactions')) || [];
-    // 支援依月份記錄的預算結構： { '2026-10': { '餐飲': 5000, ... }, '2026-11': { ... } }
     let monthlyBudgets = JSON.parse(localStorage.getItem('my_monthly_budgets')) || {};
     let savingsGoals = JSON.parse(localStorage.getItem('my_savings_goals')) || [];
 
@@ -707,7 +718,6 @@
         });
     }
 
-    // 取得指定月份的預算物件（若該月沒設定過，預設全部為 0）
     function getBudgetForMonth(yearMonthStr) {
         return monthlyBudgets[yearMonthStr] || {
             '餐飲': 0, '居住': 0, '交通': 0, '娛樂': 0, '治裝': 0,
@@ -732,7 +742,6 @@
         let prevIncome = previousTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
         let prevSavings = prevIncome - prevExpense;
 
-        // 取得當前檢視月份的預算總額
         const now = new Date();
         const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const activeBudgetMap = getBudgetForMonth(curYM);
@@ -854,6 +863,31 @@
         alert(`已成功更新【${monthVal}】的【${cat}】月預算！`);
     }
 
+    function copyLastMonthBudget() {
+        const currentSelected = document.getElementById('budget-month-picker').value;
+        if (!currentSelected) {
+            alert('請先選擇目標月份！');
+            return;
+        }
+
+        const [year, month] = currentSelected.split('-').map(Number);
+        const prevDate = new Date(year, month - 2, 1);
+        const prevYM = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+        if (!monthlyBudgets[prevYM] || Object.values(monthlyBudgets[prevYM]).every(v => v === 0)) {
+            alert(`找不到【${prevYM}】的預算紀錄，無法複製！`);
+            return;
+        }
+
+        if (confirm(`確定要將【${prevYM}】的預算設定全部複製到【${currentSelected}】嗎？（會覆蓋該月現有預算）`)) {
+            monthlyBudgets[currentSelected] = JSON.parse(JSON.stringify(monthlyBudgets[prevYM]));
+            saveData();
+            renderBudgetPlan();
+            updateDashboard();
+            alert(`成功將【${prevYM}】的預算複製到【${currentSelected}】！`);
+        }
+    }
+
     function renderBudgetPlan() {
         const selectedMonth = document.getElementById('budget-month-picker').value;
         document.getElementById('budget-plan-title').innerText = `${selectedMonth} 預算執行狀況`;
@@ -863,11 +897,26 @@
         
         const budgetMap = getBudgetForMonth(selectedMonth);
 
-        // 過濾出該月份的收支明細來計算已花費金額
         let monthTx = transactions.filter(t => {
             if (t.type !== 'expense') return false;
             return t.date.startsWith(selectedMonth);
         });
+
+        let totalBudgetSum = Object.values(budgetMap).reduce((a, b) => a + b, 0);
+        let totalSpentSum = monthTx.reduce((sum, t) => sum + t.amount, 0);
+        let totalPct = totalBudgetSum > 0 ? Math.min(Math.round((totalSpentSum / totalBudgetSum) * 100), 100) : 0;
+
+        const summaryHeader = document.getElementById('budget-summary-header');
+        if (totalBudgetSum > 0) {
+            summaryHeader.style.display = 'block';
+            document.getElementById('budget-total-percent').innerText = `${totalPct}%`;
+            document.getElementById('budget-total-summary').innerText = `已花費 ${formatCurrency(totalSpentSum)} / 總預算 ${formatCurrency(totalBudgetSum)}`;
+            const fillBar = document.getElementById('budget-total-progress');
+            fillBar.style.width = `${totalPct}%`;
+            fillBar.style.background = totalSpentSum > totalBudgetSum ? 'var(--danger)' : 'var(--primary)';
+        } else {
+            summaryHeader.style.display = 'none';
+        }
 
         for (let [cat, budget] of Object.entries(budgetMap)) {
             if (budget === 0) continue;
@@ -896,7 +945,6 @@
         }
     }
 
-    // 存款計畫相關函式
     function addSavingsGoal(e) {
         e.preventDefault();
         const name = document.getElementById('goal-name').value.trim();
@@ -909,14 +957,7 @@
             return;
         }
 
-        savingsGoals.push({
-            id: Date.now(),
-            name,
-            current,
-            target,
-            date
-        });
-
+        savingsGoals.push({ id: Date.now(), name, current, target, date });
         saveData();
         document.getElementById('goal-name').value = '';
         document.getElementById('goal-current').value = '';
