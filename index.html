@@ -494,7 +494,11 @@
                 <button type="submit" class="btn">新增紀錄</button>
             </form>
 
-            <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--text-secondary);">明細流水帳與搜尋</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin: 0;">明細流水帳與搜尋</h3>
+                <span id="tx-total-amount" style="font-size: 0.85rem; font-weight: 700; color: var(--primary);">總計: NT$ 0</span>
+            </div>
+            
             <div style="display: flex; gap: 6px; margin-bottom: 12px;">
                 <input type="date" id="filter-start-date" class="form-control" onchange="renderTransactions()">
                 <input type="date" id="filter-end-date" class="form-control" onchange="renderTransactions()">
@@ -686,7 +690,6 @@
         return 'NT$ ' + amount.toLocaleString();
     }
 
-    // 計算跨年度的所有歷史總淨儲蓄 (總收入 - 總支出)
     function getTotalLifetimeSavings() {
         let totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
         let totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
@@ -809,7 +812,7 @@
 
         const hasExpense = Object.values(catTotals).some(v => v > 0);
         if (!hasExpense) {
-            container.innerHTML = `<div class="empty-hint" style="padding: 10px 0;">本期尚無支出數據</div>`;
+            container.innerHTML = `<div class="empty-hint" style="padding: 10px 0;">尚無支出數據</div>`;
             return;
         }
 
@@ -957,7 +960,7 @@
     function addSavingsGoal(e) {
         e.preventDefault();
         const name = document.getElementById('goal-name').value.trim();
-        const current = getTotalLifetimeSavings(); // 自動代入跨年度總淨儲蓄
+        const current = getTotalLifetimeSavings();
         const target = parseFloat(document.getElementById('goal-target').value);
         const date = document.getElementById('goal-date').value;
 
@@ -976,7 +979,6 @@
     }
 
     function renderSavingsGoals() {
-        // 自動更新新增表單中的目前已存金額為最新總淨儲蓄
         const currentLifetimeSavings = getTotalLifetimeSavings();
         document.getElementById('goal-current-display').value = formatCurrency(currentLifetimeSavings);
 
@@ -988,7 +990,6 @@
 
         container.innerHTML = '';
         savingsGoals.forEach(g => {
-            // 讓現有計畫也能同步抓取最新累積的淨儲蓄金額
             g.current = currentLifetimeSavings;
             let pct = Math.min(Math.round((g.current / g.target) * 100), 100);
 
@@ -1037,7 +1038,7 @@
         if (index === -1) return;
 
         savingsGoals[index].name = document.getElementById('edit-goal-name').value.trim();
-        savingsGoals[index].current = getTotalLifetimeSavings(); // 自動保持最新淨儲蓄
+        savingsGoals[index].current = getTotalLifetimeSavings();
         savingsGoals[index].target = parseFloat(document.getElementById('edit-goal-target').value);
         savingsGoals[index].date = document.getElementById('edit-goal-date').value;
 
@@ -1065,6 +1066,15 @@
         if (startDate) filteredTx = filteredTx.filter(t => t.date >= startDate);
         if (endDate) filteredTx = filteredTx.filter(t => t.date <= endDate);
         if (keyword) filteredTx = filteredTx.filter(t => t.desc.toLowerCase().includes(keyword) || t.category.toLowerCase().includes(keyword));
+
+        // 計算目前篩選結果的總計金額 (收入加總 - 支出加總)
+        let totalSum = filteredTx.reduce((acc, t) => {
+            return t.type === 'income' ? acc + t.amount : acc - t.amount;
+        }, 0);
+
+        const totalEl = document.getElementById('tx-total-amount');
+        totalEl.innerText = `總計: ${(totalSum >= 0 ? '+' : '')}${formatCurrency(totalSum)}`;
+        totalEl.style.color = totalSum >= 0 ? 'var(--success)' : 'var(--danger)';
 
         if (filteredTx.length === 0) {
             list.innerHTML = `<div class="empty-hint">沒有找到符合條件的收支紀錄</div>`;
